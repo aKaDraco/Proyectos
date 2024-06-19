@@ -1,0 +1,309 @@
+<canvas></canvas>
+<button id="replayButton" class="hidden-button">REPLAY</button>
+<img hidden id="sprite" src="assets/sprite.png" alt="Arkanoid Game Sprite" />
+<img hidden id="bricks" src="assets/bricks.png" alt="Arkanoid Game Bricks" />
+<style>
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    background-color: #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  canvas {
+    border: 0.8vh solid #fff;
+    border-bottom: transparent;
+    background: url("./assets/bkg.png") repeat;
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+  }
+
+  .hidden-button {
+    display: none;
+  }
+
+  .show-button {
+    color: #fff;
+    position: absolute;
+    cursor: pointer;
+    border: 2px solid #fff;
+    border-radius: 2vh;
+    padding: 1vh 2vh;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 5vh;
+    text-shadow: rgb(0, 0, 0) 1px 0 10px;
+    transition: all 0.2s ease-in-out;
+    flex-direction: row;
+    background-image: linear-gradient(
+      89.7deg,
+      rgba(223, 0, 0, 1) 2.7%,
+      rgba(214, 91, 0, 1) 15.1%,
+      rgba(233, 245, 0, 1) 29.5%,
+      rgba(23, 255, 17, 1) 45.8%,
+      rgba(29, 255, 255, 1) 61.5%,
+      rgba(5, 17, 255, 1) 76.4%,
+      rgba(202, 0, 253, 1) 92.4%
+    );
+  }
+
+  .show-button:hover {
+    transform: scale(1.1);
+    box-shadow: 1vh 1vh 20vh 1vh #ffffffb9;
+  }
+</style>
+
+<script>
+  const canvas = document.querySelector("canvas");
+  const ctx = canvas.getContext("2d");
+  const $button = document.getElementById("replayButton");
+  const $score = document.getElementById("score");
+  const $sprite = document.getElementById("sprite");
+  const $bricks = document.getElementById("bricks");
+
+  canvas.width = window.innerWidth - 200;
+  canvas.height = window.innerHeight - 200;
+
+  let score = 0;
+  let rightPressed = false;
+  let leftPressed = false;
+  const PADEL_SENSITIVITY = 7;
+  let playing = true;
+
+  //PADEL VARIABLES
+  const padelWidth = 80;
+  const padelHeigh = 10;
+
+  let padelX = (canvas.width - padelWidth) / 2;
+  let padelY = canvas.height - padelHeigh - 50;
+
+  //BALL VARIABLES
+  const ballRadius = 10;
+
+  let ballX = canvas.width / 2;
+  let ballY = padelY - 10;
+
+  let ballMovementX = Math.floor(Math.random() * -2 + 2);
+  let ballMovementy = Math.floor(Math.random() * -2 + -2);
+
+  //BRICKS VARIABLES
+  const brickRowCount = Math.floor(Math.random() * 10 + 15);
+  const brickColumnCount = canvas.width / 33;
+  const brickWidth = 31;
+  const brickHeight = 16;
+  const brickPadding = 0;
+  const brickOffsetTop = canvas.height / 15;
+  const brickOffsetLeft = canvas.width / 40;
+  const bricks = [];
+  const BRICK_STATUS = {
+    ACTIVE: 1,
+    DESTROYED: 0,
+  };
+
+  for (let c = 0; c < brickColumnCount; c++) {
+    bricks[c] = [];
+    for (let r = 0; r < brickRowCount; r++) {
+      // calculo de la posiciñon del ladrillo en la pantalla
+      const brickX = c * (brickWidth + brickPadding) + brickOffsetLeft;
+      const brickY = r * (brickHeight + brickPadding) + brickOffsetTop;
+      // color aleatorio a cada ladrillo
+      const random = Math.floor(Math.random() * 8);
+      bricks[c][r] = {
+        x: brickX,
+        y: brickY,
+        status: BRICK_STATUS.ACTIVE,
+        color: random,
+      };
+    }
+  }
+
+  //DRAW FUNCTIONS
+  function drawBall() {
+    //CANVAS GRADIENT
+    //background-color: #f1f2f6;
+    //background-image: linear-gradient(315deg, #f1f2f6 0%, #c9c6c6 74%);
+    const canvasGradient = ctx.createRadialGradient(
+      ballX,
+      ballY,
+      ballRadius,
+      ballX + ballRadius,
+      ballY + ballRadius,
+      Math.PI * 2
+    );
+    canvasGradient.addColorStop(0, "#f1f2f6");
+    canvasGradient.addColorStop(0.74, "#c9c6c6");
+
+    ctx.beginPath();
+    ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+    ctx.fillStyle = canvasGradient;
+    ctx.fill();
+    ctx.closePath();
+  }
+  function drawPadel() {
+    ctx.fillStyle = "#fff";
+    ctx.drawImage(
+      $sprite, //imagen
+      29, //clipX: coordenadas del recorte
+      174, //clipy: coordenadas del recorte
+      padelWidth - 30, // tamaño del recorte Y
+      padelHeigh, // tamaña del recorte X
+      padelX, // posición X del dibujo en el canvas
+      padelY, // posición Y del dibujo en el canvas
+      padelWidth, // ancho del dibujo
+      padelHeigh // añto del dibujo
+    );
+  }
+  function drawBricks() {
+    for (let c = 0; c < brickColumnCount; c++) {
+      for (let r = 0; r < brickRowCount; r++) {
+        const currentBrick = bricks[c][r];
+        if (currentBrick.status === BRICK_STATUS.DESTROYED) {
+          continue;
+        }
+
+        const brickClipX = currentBrick.color * 32;
+
+        ctx.drawImage(
+          $bricks,
+          brickClipX,
+          0,
+          brickWidth,
+          brickHeight,
+          currentBrick.x,
+          currentBrick.y,
+          brickWidth,
+          brickHeight
+        );
+      }
+    }
+  }
+  function drawScore() {
+    ctx.font = "3vh monospace";
+    ctx.fillText(
+      "Score: " + score,
+      canvas.width - canvas.width / 7,
+      canvas.height / 20
+    );
+  }
+
+  //MOVEMENT AND COLLISION FUNCTIONS
+  function checkCollisions() {
+    //BALL TOUCHES THE RIGHT WALL
+    if (ballX > canvas.width - ballRadius) {
+      ballMovementX = -ballMovementX;
+      //BALL TOUCHES THE RIGHT WALL
+    } else if (ballX < ballRadius) {
+      ballMovementX = -ballMovementX;
+    }
+
+    //BALL TOUCHES THE TOP OF THE CANVAS
+    if (ballY < ballRadius) {
+      ballMovementy = -ballMovementy;
+    }
+
+    const isBallTouchingPadelX =
+      ballX - ballRadius > padelX && ballX - ballRadius < padelX + padelWidth;
+    const isBallTouchingPadelY = ballY == padelY - padelHeigh;
+
+    //BALL TOUCHES THE FLOOR
+    if (ballY > canvas.height + ballRadius) {
+      ballMovementX = 0;
+      ballMovementy = 0;
+      ctx.globalAlpha = 0.5;
+      $button.className = "show-button";
+      playing = false;
+      $button.addEventListener("click", () => location.reload());
+    }
+
+    if (isBallTouchingPadelX && isBallTouchingPadelY) {
+      ballMovementy = -ballMovementy;
+    }
+
+    //BRICK COLLISION
+    for (let c = 0; c < brickColumnCount; c++) {
+      for (let r = 0; r < brickRowCount; r++) {
+        const currentBrick = bricks[c][r];
+        if (currentBrick.status === BRICK_STATUS.DESTROYED) continue;
+
+        const isBallTouchingBrickX =
+          ballX - ballRadius > currentBrick.x &&
+          ballX - ballRadius < currentBrick.x + brickWidth;
+        const isBallTouchingBrickY =
+          ballY - ballRadius > currentBrick.y &&
+          ballY - ballRadius < currentBrick.y + brickHeight;
+
+        if (isBallTouchingBrickX && isBallTouchingBrickY) {
+          ballMovementy = -ballMovementy;
+          currentBrick.status = BRICK_STATUS.DESTROYED;
+          score += 10;
+        }
+      }
+    }
+  }
+  function padelMovement() {
+    if (playing) {
+      if (rightPressed && padelX < canvas.width - padelWidth) {
+        padelX += PADEL_SENSITIVITY;
+      } else if (leftPressed && padelX > 0) {
+        padelX -= PADEL_SENSITIVITY;
+      }
+    }
+  }
+  function ballMovement() {
+    ballX += ballMovementX;
+    ballY += ballMovementy;
+  }
+
+  function clearScreen() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function initEvents() {
+    document.addEventListener("keydown", keyDownHandler);
+    document.addEventListener("keyup", keyUpHandler);
+
+    function keyDownHandler(event) {
+      const { key } = event;
+      if (key == "Right" || key == "ArrowRight") {
+        rightPressed = true;
+      } else if (key == "Left" || key == "ArrowLeft") {
+        leftPressed = true;
+      }
+    }
+
+    function keyUpHandler(event) {
+      const { key } = event;
+      if (key == "Right" || key == "ArrowRight") {
+        rightPressed = false;
+      } else if (key == "Left" || key == "ArrowLeft") {
+        leftPressed = false;
+      }
+    }
+  }
+
+  function draw() {
+    clearScreen();
+
+    //DRAW OBJECTS
+    drawBall();
+    drawPadel();
+    drawBricks();
+    drawScore();
+
+    //MOVEMENT AND COLLISIONS
+    ballMovement();
+    padelMovement();
+    checkCollisions();
+
+    window.requestAnimationFrame(draw);
+  }
+
+  draw();
+  initEvents();
+</script>
